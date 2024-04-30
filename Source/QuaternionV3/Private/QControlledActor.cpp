@@ -29,9 +29,9 @@ AQControlledActor::AQControlledActor()
 	Camera->SetFieldOfView(90.0f);
 
 	// PID
-	Kp = 2500000.0;
-	Ki = 0.0;
-	Kd = 0.0;
+	Kp = 10.0;
+	Ki = 0.0; // Not used
+	Kd = 10.0;
 }
 
 // Called when the game starts or when spawned
@@ -91,27 +91,32 @@ void AQControlledActor::Look(const FVector2D Direction)
 
 void AQControlledActor::PointAt(const bool isPointing)
 {
-	float DeltaTime = GetWorld()->GetDeltaSeconds();
+	//float DeltaTime = GetWorld()->GetDeltaSeconds();
 
 	// Get the actor's location
 	FVector ShipForward = -SkeletalMesh->GetForwardVector();
 	FVector CameraForward = Camera->GetForwardVector();
 
-	// Calculate the error (angle between the ship's forward vector and the camera's forward vector)
-	float Angle = FMath::Acos(FVector::DotProduct(ShipForward.GetSafeNormal(), CameraForward.GetSafeNormal()));
-
-	// Integral
-	IntegralError += Angle * DeltaTime; // Accumulate the error over time
-	
-	// Calculate the angular velocity (change in angle over time)
-	float AngularVelocity = (Angle - PrevAngle) / DeltaTime;
-	PrevAngle = Angle;
 
 	// Calculate the torque needed to rotate the ship towards the camera
-	FVector TorqueVector = FVector::CrossProduct(ShipForward, CameraForward) * (Kp * Angle + Kd * AngularVelocity + Ki * IntegralError);
+	FVector PointingVector = FVector::CrossProduct(ShipForward, CameraForward);
+	FVector AngularVelocity = SkeletalMesh->GetPhysicsAngularVelocityInRadians();
+	FVector TorqueVector = SkeletalMesh->ScaleByMomentOfInertia(Kp * PointingVector - Kd * AngularVelocity);
 
 	// Apply torque
 	SkeletalMesh->AddTorqueInRadians(TorqueVector);
+
+	/*
+	FVector ActorLocation = GetActorLocation();
+	DrawDebugLine(GetWorld(), ActorLocation, ActorLocation + ShipForward * 1000,
+		FColor::Blue, false, 1, 0, 5);
+	DrawDebugLine(GetWorld(), ActorLocation, ActorLocation + CrossVector * 1000,
+		FColor::Yellow, false, 1, 0, 5);
+	DrawDebugLine(GetWorld(), ActorLocation, ActorLocation + AngularVelocity * 1000,
+		FColor::Orange, false, 1, 0, 5);
+	DrawDebugLine(GetWorld(), ActorLocation, ActorLocation + TorqueVector * 100,
+		FColor::Red, false, 1, 0, 5);
+	*/
 }
 
 void AQControlledActor::MoveXYZ(const FVector Direction)
